@@ -1,0 +1,19 @@
+{
+  "name": "c-zoolab-w-data",
+  "version": "1.0.0",
+  "author": "c-zoolab-w-data",
+  "description": "c-zoolab-w-data",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DerekLee-18/c-zoolab-w-data.git"
+  },
+  "main": "index.js",
+  "license": "M",
+  "scripts": {
+    "prepublishOnly": "cp -r data/* .",
+    "serve": "http-server"
+  },
+  "devDependencies": {
+    "http-server": "^0.11.1"
+  }
+}

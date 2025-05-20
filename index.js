@@ -1,0 +1,1 @@
+throw "Do not require c-zoolab-w-data directly. You should instead require each character you want to use, like: var char = require('hanzi-writer-data/我')";
