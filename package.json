@@ -1,6 +1,6 @@
 {
   "name": "c-zoolab-w-data",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "c-zoolab-w-data",
   "description": "c-zoolab-w-data",
   "repository": {
@@ -10,7 +10,7 @@
   "main": "index.js",
   "license": "M",
   "scripts": {
-    "prepublishOnly": "cpx \"data/**/*\" ./",
+    "prepublishOnly": "cpx \"data/**/*\" data",
     "serve": "http-server"
   },
   "devDependencies": {
