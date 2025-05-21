@@ -67,7 +67,9 @@ const splitPath = (path) => {
   for (let i = 0; i < terms.length; i++) {
     const command = terms[i];
     assert(command.length > 0, `Path includes empty command: ${path}`);
-    assert('LMQZ'.indexOf(command) >= 0, command);
+
+    // console.log('command', command)
+    assert('LMQCZ'.indexOf(command) >= 0, command);
     if (command === 'M' || command === 'Z') {
       if (current !== undefined) {
         assert(Point.equal(current, start), `Path has open contour: ${path}`);
@@ -93,6 +95,23 @@ const splitPath = (path) => {
       assert(Point.valid(control));
       i += 2;
     }
+
+    let controls;
+    if (command === 'C') {
+      // cubic: next four tokens are x1,y1, x2,y2
+      assert(i + 4 < terms.length, `Missing cubic control points: ${path}`);
+      const c1 = [
+        parseFloat(terms[++i], 10),
+        parseFloat(terms[++i], 10)
+      ];
+      const c2 = [
+        parseFloat(terms[++i], 10),
+        parseFloat(terms[++i], 10)
+      ];
+      assert(Point.valid(c1) && Point.valid(c2));
+      controls = [ c1, c2 ];
+    }
+
     assert(i < terms.length - 2, `Missing point on path: ${path}`);
     const end = [parseFloat(terms[i + 1], 10), parseFloat(terms[i + 2], 10)];
     assert(Point.valid(end));
@@ -100,6 +119,15 @@ const splitPath = (path) => {
     if (Point.equal(current, end)) {
       continue;
     }
+
+    const segment = { start: Point.clone(current), end };
+    if (command === 'Q') {
+      segment.control = control;      // your existing quadratic field
+    }
+    else if (command === 'C') {
+      segment.controls = controls;    // two control‐points
+    }
+
     if (control !== undefined &&
         (Point.equal(control, current) || Point.equal(control, end))) {
       control = undefined;

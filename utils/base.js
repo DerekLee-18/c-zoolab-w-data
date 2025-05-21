@@ -1,5 +1,7 @@
 // Prints the message and throws an error if the conditionis false.
 const assert = (condition, message) => {
+  // console.log('condition', condition);
+  // console.log('message', message);
   if (!condition) {
     console.error(message);
     throw new Error;

@@ -149,7 +149,7 @@ function normalizeForMatch(median) {
 // CLI: compute and print both raw & normalized for a single stroke:
 if (require.main === module) {
   // 1. Replace with your stroke data or read from file
-  const stroke = "M 436 696 Q 473 736 507 770 Q 520 780 508 798 Q 469 841 446 841 Q 434 841 433 826 Q 429 723 288 621 Q 282 618 231 580 Q 221 567 236 568 Q 255 567 285 582 Q 367 624 424 683 L 436 696 Z"
+  const stroke = "M 538 254 Q 538 291 540 345 L 541 390 Q 541 435 550 471 Q 551 487 540 496 Q 531 502 524 505 C 498 519 458 521 470 494 Q 485 470 486 396 Q 486 387 487 376 L 488 335 Q 488 292 488 242 L 490.431 223.421 Q 492.613 214.34 498.733 211.701 Q 505.082 209.503 513.873 210.113 Q 523.152 211.212 529.622 215.119 Q 535.238 218.782 537.26 226.985 L 538 254 Z"
   const raw = findStrokeMedian(stroke);
   raw.reverse();
   // const norm= normalizeForMatch(raw);
