@@ -1,25 +1,160 @@
 // utils/genMedians.js
-const path = require('svg-path-properties');
-const fs = require('fs');
+const simplify = require('./external/simplify/1.2.2/simplify');
+const { assert, Point } = require('./base');
+const { svg } = require('./svg');
+const Voronoi    = require('./external/voronoi/0.98/rhill-voronoi-core.js');
+// const Voronoi = require('voronoi');
 
-// 1. Paste your new stroke path string here:
-const theNewStroke = "M 538 254 Q 538 291 540 345 L 541 390 Q 541 435 550 471 Q 551 487 540 496 Q 531 502 524 505 C 498 519 458 521 470 494 Q 485 470 486 396 Q 486 387 487 376 L 488 335 Q 488 292 488 242 L 490.431 223.421 Q 492.613 214.34 498.733 211.701 Q 505.082 209.503 513.873 210.113 Q 523.152 211.212 529.622 215.119 Q 535.238 218.782 537.26 226.985 L 538 254 Z"
+// Canvas dimensions (same as Hanzi Writer)
+const CANVAS_SIZE = 1024;
+const Y_RISE      = 900;
+const MATCH_POINTS = 8;
 
-const properties = new path.svgPathProperties(theNewStroke);
+/**
+ * Uniformly resample a polyline `median` down to `n` points along its arc-length.
+ */
+function filterMedian(median, n) {
+  // compute segment lengths
+  const distances = median.slice(0, -1).map((p, i) =>
+    Math.hypot(
+      median[i+1][0] - p[0],
+      median[i+1][1] - p[1]
+    )
+  );
+  const total = distances.reduce((sum, d) => sum + d, 0);
 
-const L = properties.getTotalLength();
+  const result = [];
+  let index = 0;
+  let pos   = median[0].slice();
+  let acc   = 0;
 
-// 3. Decide how many median points you want
-const POINTS = 5;
-const medians = [];
-
-for (let i = 0; i < POINTS; i++) {
-  // distribute t from 0 to L
-  const pt = properties.getPointAtLength((L * i) / (POINTS - 1));
-  medians.push([ Math.round(pt.x), Math.round(pt.y) ]);
+  for (let i = 0; i < n - 1; i++) {
+    const target = (total * i) / (n - 1);
+    while (acc < target && index < median.length - 1) {
+      const segLen = Math.hypot(
+        median[index+1][0] - pos[0],
+        median[index+1][1] - pos[1]
+      );
+      if (acc + segLen < target) {
+        acc += segLen;
+        index++;
+        pos = median[index].slice();
+      } else {
+        const t = (target - acc) / segLen;
+        pos = [
+          pos[0] + t * (median[index+1][0] - pos[0]),
+          pos[1] + t * (median[index+1][1] - pos[1])
+        ];
+        acc = target;
+      }
+    }
+    result.push([pos[0], pos[1]]);
+  }
+  // Ensure last point matches
+  result.push(median[median.length - 1].slice());
+  return result;
 }
 
-// 4. Output JSON snippet
-console.log(JSON.stringify(medians, null));
+/**
+ * Depth-first: find the longest shortest-path from `node`.
+ */
+function findPathFromFurthestNode(adjacency, vertices, node, visited = {}) {
+  visited[node] = true;
+  let best = { path: [], distance: 0 };
+  for (const nb of adjacency[node] || []) {
+    if (!visited[nb]) {
+      const cand = findPathFromFurthestNode(adjacency, vertices, nb, visited);
+      cand.distance += Math.hypot(
+        vertices[node][0] - vertices[nb][0],
+        vertices[node][1] - vertices[nb][1]
+      );
+      if (cand.distance > best.distance) best = cand;
+    }
+  }
+  best.path.push(node);
+  return best;
+}
 
-// (Optionally write back into your character JSON file)
+/**
+ * Two-run trick: A→furthest=B, then B→furthest=C gives diameter path.
+ */
+function findLongestShortestPath(adjacency, vertices, root) {
+  const first = findPathFromFurthestNode(adjacency, vertices, root);
+  const second = findPathFromFurthestNode(adjacency, vertices, first.path[0]);
+  return second.path;
+}
+
+/**
+ * Compute the geometric median-line (skeleton) of an SVG stroke.
+ * Returns an array of [x,y] centerline points.
+ */
+function findStrokeMedian(stroke) {
+  // 1) Convert path to simple polygon
+  const paths = svg.convertSVGPathToPaths(stroke);
+  assert(paths.length === 1, `Expected one loop, got ${paths.length}`);
+  let polygon, diagram;
+  // 2) Voronoi of boundary points (two levels of approx)
+  for (const res of [16, 64]) {
+    polygon = svg.getPolygonApproximation(paths[0], res);
+    const vor = new Voronoi();
+    diagram = vor.compute(
+      polygon.map(p => ({ x: p[0], y: p[1] })),
+      { xl: -CANVAS_SIZE, xr: CANVAS_SIZE, yt: -CANVAS_SIZE, yb: CANVAS_SIZE }
+    );
+    if (diagram) { voronoi = vor; break; }
+  }
+  assert(diagram, 'Voronoi failed');
+
+  // 3) Keep only interior vertices & build adjacency
+  diagram.vertices.forEach((v, i) => {
+    v.include = svg.polygonContainsPoint(polygon, [v.x, v.y]);
+    v.idx = i;
+  });
+  const vertices = diagram.vertices.map(v => [Math.round(v.x), Math.round(v.y)]);
+
+  const edges = diagram.edges
+    .map(e => [e.va.idx, e.vb.idx])
+    .filter(([a,b]) => diagram.vertices[a].include && diagram.vertices[b].include);
+  voronoi.recycle(diagram);
+
+  const adjacency = {};
+  edges.forEach(([a,b]) => {
+    (adjacency[a] = adjacency[a]||[]).push(b);
+    (adjacency[b] = adjacency[b]||[]).push(a);
+  });
+
+  // 4) Extract longest path through skeleton
+  const root = edges[0][0];
+  const path = findLongestShortestPath(adjacency, vertices, root);
+  const points = path.map(i => vertices[i]);
+
+  // 5) Simplify tiny zig-zags
+  const simplified = simplify(points.map(p => ({ x: p[0], y: p[1] })), 4);
+  return simplified.map(p => [p.x, p.y]);
+}
+
+/**
+ * Normalize the median line to [0,1]×[0,1] with fixed point count.
+ */
+function normalizeForMatch(median) {
+  // 1) Resample to MATCH_POINTS
+  const filtered = filterMedian(median, MATCH_POINTS);
+  // 2) Scale into unit square, flipping y
+  return filtered.map(([x,y]) => [
+    x / CANVAS_SIZE,
+    (Y_RISE - y) / CANVAS_SIZE
+  ]);
+}
+
+// CLI: compute and print both raw & normalized for a single stroke:
+if (require.main === module) {
+  // 1. Replace with your stroke data or read from file
+  const stroke = "M 436 696 Q 473 736 507 770 Q 520 780 508 798 Q 469 841 446 841 Q 434 841 433 826 Q 429 723 288 621 Q 282 618 231 580 Q 221 567 236 568 Q 255 567 285 582 Q 367 624 424 683 L 436 696 Z"
+  const raw = findStrokeMedian(stroke);
+  raw.reverse();
+  // const norm= normalizeForMatch(raw);
+  console.log('raw medians:', JSON.stringify(raw, null));
+  // console.log('normalized:', JSON.stringify(norm, null));
+}
+
+module.exports = { findStrokeMedian, normalizeForMatch };
