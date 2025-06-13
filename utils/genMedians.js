@@ -148,7 +148,7 @@ function normalizeForMatch(median) {
 
 // 1. Replace with your stroke data or read from file
   const STROKE = 
-   "M 534 539 Q 543 603 546 630 Q 548 641 546 645 Q 546 661 515 663 Q 497 665 496 645 C 495 503 530 509 534 539 Z"
+   "M 702 639 Q 729 641 731 665 Q 727 690 676 686 Q 649 684 627 682 C 587 681 597 638 599 636 Q 643 636 677 638 L 702 639 Z"
 
 if (require.main === module) {
 
