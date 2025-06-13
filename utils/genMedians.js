@@ -155,7 +155,7 @@ if (require.main === module) {
   const raw = findStrokeMedian(STROKE);
 
   // sometimes reverse, sometimes not. I dont know... the reverse seems like the 筆順
-  raw.reverse();
+  // raw.reverse();
   // const norm= normalizeForMatch(raw);
   console.log('raw medians:', JSON.stringify(raw, null));
   // console.log('normalized:', JSON.stringify(norm, null));
